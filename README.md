@@ -21,6 +21,12 @@ and this has to be addressed first.
 
 7. Have both "Polling" and "Web Hook" ways of doing this. Not everyone needs to set up a server to listen to hooks. Polling might work just fine for some.
 
+8. Send a notification in hipchat even when the cards are being reshuffled in a list. Team members need to be intimated of priority change.
+
+9. If a due date is changed to a later date, the card should be marked as Delayed. Also the cards should be monitored daily and if a due date is skipped, they should be marked as "Skipped Deadline"
+And finally those which are moved to Done list, should be marked as Completed. (Mark means label). 
+So at any time, we can switch to calendar view and view the milestones/tasks which were Delayed and/or Skipped Deadline and/or Completed/Not Completed
+
 
 Idea
 =====
@@ -38,4 +44,10 @@ the card between lists will also change the status of linked issue in github.
 "Doing" list. If all tasks/issues of a milestone move to the "Done" list, the milestone will also
 move to the Done list
 
-5. Enable a summary view of the tasks in the Milestones board itself by mapping each Task card to a checklist item and grouping the checklists by the assignee name. The checklist should get automatically checked when the corresponding task gets moved to "Done" list
+5. Have a periodic task running at a fixed time every day which reviews the milestone cards and task cards and if the due date was crossed, marks them as "Skipped Deadline"
+
+6. If a due date is postponed for a milestone card or a task card, mark a label as "Delayed"
+
+7. Mark a card as "Completed" when it is moved to Done list.
+
+8. Enable a summary view of the tasks in the Milestones board itself by mapping each Task card to a checklist item and grouping the checklists by the assignee name. The checklist should get automatically checked when the corresponding task gets moved to "Done" list
