@@ -27,6 +27,32 @@ and this has to be addressed first.
 And finally those which are moved to Done list, should be marked as Completed. (Mark means label). 
 So at any time, we can switch to calendar view and view the milestones/tasks which were Delayed and/or Skipped Deadline and/or Completed/Not Completed
 
+10. Also have a command line client which will let the members view the current tasks and milestones in the same order  as listed in trello lists like this
+
+```bash
+
+$ tasks
+
+todo
+-----
+
+create reviewer component #453 | due on 3rd March 8:00 PM | #enhancement | github_url: github.com/issues/452 | trello_card_url: trello.com/boards/tasks/weewtwe
+
+fix the label issue in mugs #442 | due on 5th March 9:00 PM | #bug | github_url: github.com/issues/452 | trello_card_url: trello.com/boards/tasks/weewtwe
+
+Talk to Murugan and get shipping rates excel | due on 5th March 9:00 PM | #non-dev | github_url: github.com/issues/452 | trello_card_url: trello.com/boards/tasks/weewtwe
+
+doing
+------
+
+No Tasks in this list
+
+done
+-----
+
+No Tasks in this list
+
+```
 
 Idea
 =====
