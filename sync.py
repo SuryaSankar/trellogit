@@ -21,10 +21,6 @@ config.from_pyfile("app.cfg.py")
 
 # TASKS_BOARD_DEV_LABEL_ID = "lkjlpjlkjlpjlkjlpjlkj"        #
 
-# TASKS_BOARD_LISTS = {                                     #
-#     'To Do': "ljlkhlkhlkhlkhlkhlk"                        #
-# }
-
 # REPO_OWNER = "inkmonk"                                    #
 
 # REPO_NAME = "trellogit"                                   #
@@ -65,13 +61,29 @@ existing_milestone_cards = trello.get(
 existing_issue_cards = trello.get(
     "%s/boards/%s/cards" % (trello_api, config['TASKS_BOARD_ID'])).json()
 
+tasks_board_lists = config.get('TASKS_BOARD_LISTS', {})
+
+if tasks_board_lists == {}:
+    lists = trello.get(
+        "%s/boards/%s/lists" % (trello_api, config['TASKS_BOARD_ID'])).json()
+    for lst in lists:
+        tasks_board_lists[lst['name']] = lst['id']
+
+milestones_board_lists = config.get('MILESTONES_BOARD_LISTS', {})
+
+if milestones_board_lists == {}:
+    lists = trello.get(
+        "%s/boards/%s/lists" % (trello_api, config['MILESTONES_BOARD_ID'])).json()
+    for lst in lists:
+        milestones_board_lists[lst['name']] = lst['id']
+
 
 def github_to_trello_sync():
 
     for m in existing_gh_milestones:
         gh_issues = github.get(
             "%s/repos/%s/%s/issues" % (github_api, config['REPO_OWNER'], config['REPO_NAME']),
-            params={"milestone": int(m['number'])}).json()
+            params={"milestone": int(m['number']), "state": "all"}).json()
 
         try:
             milestone_label = next(
@@ -87,13 +99,13 @@ def github_to_trello_sync():
         issue_cards = []
         for issue in gh_issues:
             if issue['state'] == 'closed':
-                list_to_be_added_to = config['TASKS_BOARD_LISTS']['Done']
+                list_to_be_added_to = tasks_board_lists['Done']
             else:
-                list_to_be_added_to = config['TASKS_BOARD_LISTS']['To Do']
+                list_to_be_added_to = tasks_board_lists['To Do']
                 if issue['comments'] == 0:
                     issue_events = github.get(issue['events_url']).json()
                     if any(event['commit_id'] is not None for event in issue_events):
-                        list_to_be_added_to = config['TASKS_BOARD_LISTS']['Doing']
+                        list_to_be_added_to = tasks_board_lists['Doing']
 
             try:
                 issue_card = next(
@@ -125,14 +137,14 @@ def github_to_trello_sync():
                 issue_card = trello.post("https://api.trello.com/1/cards", data=issue_card).json()
             issue_cards.append(issue_card)
 
-        if all(card['idList'] == config['TASKS_BOARD_LISTS']['Done'] for card in issue_cards):
-            milestone_list_to_use = config['MILESTONES_BOARD_LISTS']['Done']
+        if all(card['idList'] == tasks_board_lists['Done'] for card in issue_cards):
+            milestone_list_to_use = milestones_board_lists['Done']
         elif any(card['idList'] in (
-                config['TASKS_BOARD_LISTS']['Doing'],
-                config['TASKS_BOARD_LISTS']['Done']) for card in issue_cards):
-            milestone_list_to_use = config['MILESTONES_BOARD_LISTS']['Doing']
+                tasks_board_lists['Doing'],
+                tasks_board_lists['Done']) for card in issue_cards):
+            milestone_list_to_use = milestones_board_lists['Doing']
         else:
-            milestone_list_to_use = config['MILESTONES_BOARD_LISTS']['To Do']
+            milestone_list_to_use = milestones_board_lists['To Do']
 
         members_to_assign = ",".join(
             list(set(config['GIT_TO_TRELLO'][i['assignee']['login']] for i in gh_issues)))
