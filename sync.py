@@ -58,7 +58,6 @@ existing_gh_milestones = github.get("%s/repos/%s/%s/milestones" % (
 
 existing_milestone_labels = trello.get("%s/boards/%s/labels" % (
     trello_api, config['TASKS_BOARD_ID'])).json()
-print existing_milestone_labels
 
 existing_milestone_cards = trello.get(
     "%s/boards/%s/cards" % (trello_api, config['MILESTONES_BOARD_ID'])).json()
