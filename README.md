@@ -40,7 +40,7 @@ create reviewer component #453 | due on 3rd March 8:00 PM | #enhancement | githu
 
 fix the label issue in mugs #442 | due on 5th March 9:00 PM | #bug | github_url: github.com/issues/452 | trello_card_url: trello.com/boards/tasks/weewtwe
 
-Talk to Murugan and get shipping rates excel | due on 5th March 9:00 PM | #non-dev | github_url: github.com/issues/452 | trello_card_url: trello.com/boards/tasks/weewtwe
+Talk to Murugan and get shipping rates excel | due on 5th March 9:00 PM | #non-dev | trello_card_url: trello.com/boards/tasks/weewtwe
 
 doing
 ------
