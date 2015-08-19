@@ -257,16 +257,18 @@ class OneTimeSyncer(object):
 
 @app.route('/')
 def home():
-    record = json.dumps(json.load('record.txt'))
+    with open('record.txt', 'w') as fp:
+        record = json.dumps(json.load(fp))
     return render_template("index.html", record=record)
 
 
 @app.route('/milestones', methods=['POST', 'HEAD'])
 def record_milestone_card_action():
-    # json.dump({
-    #     "headers": request.headers,
-    #     "data": request.get_json()
-    # }, 'record.txt')
+    with open("record.txt", "w") as fp:
+        json.dump({
+            "headers": request.headers,
+            "data": request.get_json()
+        }, fp)
     return Response(jsoned({'status': 'success'}, wrap=False),
                     200, mimetype='application/json')
 
