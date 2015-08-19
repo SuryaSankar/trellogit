@@ -6,6 +6,7 @@ from toolspy import keygetter
 from flask import Flask, render_template, request, Response, current_app
 import json
 from flask_sqlalchemy_booster.responses import jsoned
+from flask_sqlalchemy_booster.json_encoder import json_encoder
 import traceback
 
 # config = Config(os.getcwd())
@@ -259,7 +260,7 @@ class OneTimeSyncer(object):
 @app.route('/')
 def home():
     with open('record.txt', 'w') as fp:
-        record = json.dumps(json.load(fp))
+        record = json.dumps(json.load(fp), default=json_encoder)
     return render_template("index.html", record=record)
 
 
@@ -270,7 +271,7 @@ def record_milestone_card_action():
             json.dump({
                 "headers": request.headers,
                 "data": request.get_json()
-            }, fp)
+            }, fp, default=json_encoder)
     except Exception as e:
         current_app.logger.exception(e)
         traceback.print_exc()
