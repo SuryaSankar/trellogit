@@ -256,13 +256,16 @@ def register_milestones_board_trello_hook(hook_server=None):
 
 @app.route('/')
 def home():
-    record = json.dumps(json.load('record.json'))
+    record = json.dumps(json.load('record.txt'))
     return render_template("index.html", record=record)
 
 
 @app.route('/milestones')
 def record_milestone_card_action():
-    json.dump(request.get_json(), 'record.json')
+    json.dump({
+        "headers": request.headers,
+        "data": request.get_json()
+    }, 'record.txt')
     return Response(jsoned({'status': 'success'}, wrap=False),
                     200, mimetype='application/json')
 
