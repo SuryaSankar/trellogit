@@ -1,13 +1,13 @@
 import requests
 import os
-from flask.config import Config
+# from flask.config import Config
 from itertools import groupby
 from toolspy import keygetter
 from flask import Flask, render_template
 import json
 
-config = Config(os.getcwd())
-config.from_pyfile("app.cfg.py")
+# config = Config(os.getcwd())
+# config.from_pyfile("app.cfg.py")
 
 
 # ######## Sample cfg file ##################################
