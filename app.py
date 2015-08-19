@@ -6,6 +6,7 @@ from toolspy import keygetter
 from flask import Flask, render_template, request, Response, current_app
 import json
 from flask_sqlalchemy_booster.responses import jsoned
+import traceback
 
 # config = Config(os.getcwd())
 # config.from_pyfile("app.cfg.py")
@@ -272,6 +273,7 @@ def record_milestone_card_action():
             }, fp)
     except Exception as e:
         current_app.logger.exception(e)
+        traceback.print_exc()
     return Response(jsoned({'status': 'success'}, wrap=False),
                     200, mimetype='application/json')
 
