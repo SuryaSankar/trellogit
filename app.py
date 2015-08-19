@@ -267,11 +267,14 @@ def home():
 @app.route('/milestones', methods=['POST', 'HEAD'])
 def record_milestone_card_action():
     try:
+        print os.getcwd()
+        print os.listdir(".")
         with open("record.txt", "w") as fp:
             json.dump({
                 "headers": request.headers,
                 "data": request.get_json()
             }, fp, default=json_encoder)
+            print request.get_json()
     except Exception as e:
         current_app.logger.exception(e)
         traceback.print_exc()
