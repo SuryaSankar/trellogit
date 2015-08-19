@@ -261,7 +261,7 @@ def home():
     return render_template("index.html", record=record)
 
 
-@app.route('/milestones', methods=['POST'])
+@app.route('/milestones', methods=['POST', 'HEAD'])
 def record_milestone_card_action():
     # json.dump({
     #     "headers": request.headers,
