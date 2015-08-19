@@ -3,11 +3,10 @@ import os
 # from flask.config import Config
 from itertools import groupby
 from toolspy import keygetter
-from flask import Flask, render_template, request, Response, current_app
+from flask import Flask, render_template, request, Response
 import json
 from flask_sqlalchemy_booster.responses import jsoned
 from flask_sqlalchemy_booster.json_encoder import json_encoder
-import traceback
 
 # config = Config(os.getcwd())
 # config.from_pyfile("app.cfg.py")
@@ -46,32 +45,35 @@ app = Flask(__name__)
 trello_api = "https://api.trello.com/1"
 github_api = "https://api.github.com"
 
+github_api_repo_root = "%s/repos/%s/%s" % (
+    github_api, os.environ['TRELLOGIT_REPO_OWNER'], os.environ['TRELLOGIT_REPO_NAME'])
+
 trello = requests.Session()
 github = requests.Session()
 
 trello.params.update({
-    'key': os.environ['TRELLO_KEY'],
-    "token": os.environ['TRELLO_TOKEN']
+    'key': os.environ['TRELLOGIT_TRELLO_KEY'],
+    "token": os.environ['TRELLOGIT_TRELLO_TOKEN']
 })
 
-github.headers.update({'Authorization': 'token %s' % os.environ['GITHUB_TOKEN']})
+github.headers.update({'Authorization': 'token %s' % os.environ['TRELLOGIT_GITHUB_TOKEN']})
 
 
 # existing_gh_milestones = github.get("%s/repos/%s/%s/milestones" % (
 #     github_api, os.environ['REPO_OWNER'], os.environ['REPO_NAME'])).json()
 
-class OneTimeSyncer(object):
+class Initializer(object):
 
     def __init__(self):
 
-        self.git_to_trello_assignee_map = json.loads(os.environ["GIT_TO_TRELLO"])
+        self.git_to_trello_assignee_map = json.loads(os.environ["TRELLOGIT_GIT_TO_TRELLO"])
 
         # self.tasks_board_lists = config.get('TASKS_BOARD_LISTS', {})
 
         # if self.tasks_board_lists == {}:
         self.tasks_board_lists = {}
         lists = trello.get(
-            "%s/boards/%s/lists" % (trello_api, os.environ['TASKS_BOARD_ID'])).json()
+            "%s/boards/%s/lists" % (trello_api, os.environ['TRELLOGIT_TASKS_BOARD_ID'])).json()
         for lst in lists:
             self.tasks_board_lists[lst['name']] = lst['id']
 
@@ -80,30 +82,31 @@ class OneTimeSyncer(object):
         # if self.milestones_board_lists == {}:
         self.milestones_board_lists = {}
         lists = trello.get(
-            "%s/boards/%s/lists" % (trello_api, os.environ['MILESTONES_BOARD_ID'])).json()
+            "%s/boards/%s/lists" % (trello_api, os.environ['TRELLOGIT_MILESTONES_BOARD_ID'])).json()
         for lst in lists:
             self.milestones_board_lists[lst['name']] = lst['id']
 
         self.milestones_board = trello.get(
-            "%s/boards/%s" % (trello_api, os.environ['MILESTONES_BOARD_ID'])).json()
+            "%s/boards/%s" % (trello_api, os.environ['TRELLOGIT_MILESTONES_BOARD_ID'])).json()
         # os.environ['MILESTONES_BOARD_ID'] = self.milestones_board['id']
 
         self.tasks_board = trello.get(
-            "%s/boards/%s" % (trello_api, os.environ['TASKS_BOARD_ID'])).json()
+            "%s/boards/%s" % (trello_api, os.environ['TRELLOGIT_TASKS_BOARD_ID'])).json()
         # os.environ['TASKS_BOARD_ID'] = self.tasks_board['id']
 
     def fetch_existing_github_state(self):
         self.existing_milestone_labels = trello.get("%s/boards/%s/labels" % (
-            trello_api, os.environ['TASKS_BOARD_ID'])).json()
+            trello_api, os.environ['TRELLOGIT_TASKS_BOARD_ID'])).json()
 
         self.existing_milestone_cards = trello.get(
-            "%s/boards/%s/cards" % (trello_api, os.environ['MILESTONES_BOARD_ID'])).json()
+            "%s/boards/%s/cards" % (trello_api, os.environ['TRELLOGIT_MILESTONES_BOARD_ID'])).json()
 
         self.existing_issue_cards = trello.get(
-            "%s/boards/%s/cards" % (trello_api, os.environ['TASKS_BOARD_ID'])).json()
+            "%s/boards/%s/cards" % (trello_api, os.environ['TRELLOGIT_TASKS_BOARD_ID'])).json()
 
         self.issues_response = github.get(
-            "%s/repos/%s/%s/issues" % (github_api, os.environ['REPO_OWNER'], os.environ['REPO_NAME']),
+            "%s/repos/%s/%s/issues" % (
+                github_api, os.environ['TRELLOGIT_REPO_OWNER'], os.environ['TRELLOGIT_REPO_NAME']),
             params={"state": "all", "per_page": 100})
 
         self.issues = []
@@ -151,8 +154,10 @@ class OneTimeSyncer(object):
             if issue_card['idList'] != list_to_be_added_to:
                 data_to_update['idList'] = list_to_be_added_to
             if issue['assignee'] is not None:
-                if issue_card['idMembers'] != self.git_to_trello_assignee_map[issue['assignee']['login']]:
-                    data_to_update['idMembers'] = self.git_to_trello_assignee_map[issue['assignee']['login']]
+                if issue_card['idMembers'] != self.git_to_trello_assignee_map[
+                        issue['assignee']['login']]:
+                    data_to_update['idMembers'] = self.git_to_trello_assignee_map[
+                        issue['assignee']['login']]
             if len(data_to_update.keys()) > 0:
                 issue_card = trello.put("%s/cards/%s" % (
                     trello_api, issue_card['id']), data=data_to_update).json()
@@ -166,9 +171,10 @@ class OneTimeSyncer(object):
                 issue_card["due"] = milestone['due_on']
             if milestone_label is not None:
                 issue_card["idLabels"] = ",".join(
-                    [milestone_label['id'], os.environ['TASKS_BOARD_DEV_LABEL_ID']])
+                    [milestone_label['id'], os.environ['TRELLOGIT_TASKS_BOARD_DEV_LABEL_ID']])
             if issue['assignee'] is not None:
-                issue_card["idMembers"] = self.git_to_trello_assignee_map[issue['assignee']['login']]
+                issue_card["idMembers"] = self.git_to_trello_assignee_map[
+                    issue['assignee']['login']]
 
             issue_card = trello.post("https://api.trello.com/1/cards", data=issue_card).json()
 
@@ -180,7 +186,8 @@ class OneTimeSyncer(object):
 
         for m, gh_issues in self.grouped_issues:
             # gh_issues = github.get(
-            #     "%s/repos/%s/%s/issues" % (github_api, os.environ['REPO_OWNER'], os.environ['REPO_NAME']),
+            #     "%s/repos/%s/%s/issues" % (github_api, os.environ[
+            #    'REPO_OWNER'], os.environ['REPO_NAME']),
             #     params={"milestone": int(m['number']), "state": "all"}).json()
 
             if m is None:
@@ -194,7 +201,7 @@ class OneTimeSyncer(object):
                     milestone_label = trello.post("https://api.trello.com/1/labels", data={
                         'name': "%s#%s" % (m['title'], m['number']),
                         'color': 'green',
-                        'idBoard': os.environ['TASKS_BOARD_ID']
+                        'idBoard': os.environ['TRELLOGIT_TASKS_BOARD_ID']
                     }).json()
 
             issue_cards = map(lambda issue: self.update_or_create_task_card(
@@ -247,7 +254,7 @@ class OneTimeSyncer(object):
     def register_milestones_board_trello_hook(self, hook_server=None):
         if hook_server is None:
             hook_server = os.environ['TRELLOGIT_WEBHOOK']
-        callback_url = hook_server + "/milestones"
+        callback_url = hook_server + "/trello/milestones"
         result = trello.post("%s/webhooks" % trello_api, data={
             "description": "Milestone board hook",
             "callbackURL": callback_url,
@@ -256,32 +263,85 @@ class OneTimeSyncer(object):
         print result
         return result
 
+    def register_issues_github_hook(self, hook_server=None):
+        if hook_server is None:
+            hook_server = os.environ['TRELLOGIT_WEBHOOK']
+        callback_url = hook_server + "/github/issues"
+        result = github.post("%s/hooks" % github_api_repo_root, data={
+            "name": "web",
+            "events": ["issues"],
+            "config": {
+                "url": callback_url,
+                "content_type": "json",
+                "insecure_ssl": 1
+            }
+        })
+        print result
+        return result
+
 
 @app.route('/')
 def home():
-    with open('record.txt', 'w') as fp:
-        record = json.dumps(json.load(fp), default=json_encoder)
-    return render_template("index.html", record=record)
+    return render_template("index.html")
 
 
-@app.route('/milestones', methods=['POST', 'HEAD'])
+@app.route('/github/issues', methods=['POST', 'HEAD'])
+def github_issues_hook():
+    json_data = request.get_json()
+    print json_data
+    return Response(jsoned({'status': 'success'}, wrap=False),
+                    200, mimetype='application/json')
+
+
+@app.route('/github/issue_comments', methods=['POST', 'HEAD'])
+def github_issue_comments_hook():
+    json_data = request.get_json()
+    print json_data
+    return Response(jsoned({'status': 'success'}, wrap=False),
+                    200, mimetype='application/json')
+
+
+@app.route('/trello/tasks', methods=['POST', 'HEAD'])
+def trello_tasks_hook():
+    json_data = request.get_json()
+    print json_data
+    return Response(jsoned({'status': 'success'}, wrap=False),
+                    200, mimetype='application/json')
+
+
+@app.route('/trello/milestones', methods=['POST', 'HEAD'])
 def record_milestone_card_action():
-    try:
-        print os.getcwd()
-        print os.listdir(".")
-        with open("record.txt", "w") as fp:
-            json.dump({
-                "headers": request.headers,
-                "data": request.get_json()
-            }, fp, default=json_encoder)
-            print request.get_json()
-    except Exception as e:
-        current_app.logger.exception(e)
-        traceback.print_exc()
+    # try:
+    #     print os.getcwd()
+    #     print os.listdir(".")
+    #     with open("record.txt", "w") as fp:
+    #         json.dump({
+    #             "headers": request.headers,
+    #             "data": request.get_json()
+    #         }, fp, default=json_encoder)
+    #         print request.get_json()
+    # except Exception as e:
+    #     current_app.logger.exception(e)
+    #     traceback.print_exc()
+    json_data = request.get_json()
+    print json_data
+    if json_data['action']['type'] == 'updateCard':
+        action_data = json_data['action']['data']
+        card_full_data = trello.get("%s/boards/%s/cards/%s" % (
+            trello_api, action_data['board']['id'], action_data['card']['id']))
+        print card_full_data
+        if action_data['listAfter']['name'] != 'Backlog':
+            data = {
+                'title': action_data['card']['name']
+            }
+            resp = github.post("%s/milestones" % github_api, data=data)
+            print resp.json()
+
     return Response(jsoned({'status': 'success'}, wrap=False),
                     200, mimetype='application/json')
 
 
 if __name__ == '__main__':
-    syncer = OneTimeSyncer()
-    syncer.github_to_trello_sync()
+    initializer = Initializer()
+    # initializer.github_to_trello_sync()
+    app.run(use_reloader=True, use_debugger=True, threaded=True)
