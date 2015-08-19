@@ -4,6 +4,7 @@ from flask.config import Config
 from itertools import groupby
 from toolspy import keygetter
 from flask import Flask, render_template
+import json
 
 config = Config(os.getcwd())
 config.from_pyfile("app.cfg.py")
@@ -46,56 +47,60 @@ trello = requests.Session()
 github = requests.Session()
 
 trello.params.update({
-    'key': config['TRELLO_KEY'],
-    "token": config['TRELLO_TOKEN']
+    'key': os.environ['TRELLO_KEY'],
+    "token": os.environ['TRELLO_TOKEN']
 })
 
-github.headers.update({'Authorization': 'token %s' % config['GITHUB_TOKEN']})
+github.headers.update({'Authorization': 'token %s' % os.environ['GITHUB_TOKEN']})
 
 
 # existing_gh_milestones = github.get("%s/repos/%s/%s/milestones" % (
-#     github_api, config['REPO_OWNER'], config['REPO_NAME'])).json()
+#     github_api, os.environ['REPO_OWNER'], os.environ['REPO_NAME'])).json()
 
 class OneTimeSyncer(object):
 
     def __init__(self):
 
-        self.tasks_board_lists = config.get('TASKS_BOARD_LISTS', {})
+        self.git_to_trello_assignee_map = json.loads(os.environ["GIT_TO_TRELLO"])
 
-        if self.tasks_board_lists == {}:
-            lists = trello.get(
-                "%s/boards/%s/lists" % (trello_api, config['TASKS_BOARD_ID'])).json()
-            for lst in lists:
-                self.tasks_board_lists[lst['name']] = lst['id']
+        # self.tasks_board_lists = config.get('TASKS_BOARD_LISTS', {})
 
-        self.milestones_board_lists = config.get('MILESTONES_BOARD_LISTS', {})
+        # if self.tasks_board_lists == {}:
+        self.tasks_board_lists = {}
+        lists = trello.get(
+            "%s/boards/%s/lists" % (trello_api, os.environ['TASKS_BOARD_ID'])).json()
+        for lst in lists:
+            self.tasks_board_lists[lst['name']] = lst['id']
 
-        if self.milestones_board_lists == {}:
-            lists = trello.get(
-                "%s/boards/%s/lists" % (trello_api, config['MILESTONES_BOARD_ID'])).json()
-            for lst in lists:
-                self.milestones_board_lists[lst['name']] = lst['id']
+        # self.milestones_board_lists = config.get('MILESTONES_BOARD_LISTS', {})
+
+        # if self.milestones_board_lists == {}:
+        self.milestones_board_lists = {}
+        lists = trello.get(
+            "%s/boards/%s/lists" % (trello_api, os.environ['MILESTONES_BOARD_ID'])).json()
+        for lst in lists:
+            self.milestones_board_lists[lst['name']] = lst['id']
 
         self.milestones_board = trello.get(
-            "%s/boards/%s" % (trello_api, config['MILESTONES_BOARD_ID'])).json()
-        config['MILESTONES_BOARD_ID'] = self.milestones_board['id']
+            "%s/boards/%s" % (trello_api, os.environ['MILESTONES_BOARD_ID'])).json()
+        os.environ['MILESTONES_BOARD_ID'] = self.milestones_board['id']
 
         self.tasks_board = trello.get(
-            "%s/boards/%s" % (trello_api, config['TASKS_BOARD_ID'])).json()
-        config['TASKS_BOARD_ID'] = self.tasks_board['id']
+            "%s/boards/%s" % (trello_api, os.environ['TASKS_BOARD_ID'])).json()
+        os.environ['TASKS_BOARD_ID'] = self.tasks_board['id']
 
     def fetch_existing_github_state(self):
         self.existing_milestone_labels = trello.get("%s/boards/%s/labels" % (
-            trello_api, config['TASKS_BOARD_ID'])).json()
+            trello_api, os.environ['TASKS_BOARD_ID'])).json()
 
         self.existing_milestone_cards = trello.get(
-            "%s/boards/%s/cards" % (trello_api, config['MILESTONES_BOARD_ID'])).json()
+            "%s/boards/%s/cards" % (trello_api, os.environ['MILESTONES_BOARD_ID'])).json()
 
         self.existing_issue_cards = trello.get(
-            "%s/boards/%s/cards" % (trello_api, config['TASKS_BOARD_ID'])).json()
+            "%s/boards/%s/cards" % (trello_api, os.environ['TASKS_BOARD_ID'])).json()
 
         self.issues_response = github.get(
-            "%s/repos/%s/%s/issues" % (github_api, config['REPO_OWNER'], config['REPO_NAME']),
+            "%s/repos/%s/%s/issues" % (github_api, os.environ['REPO_OWNER'], os.environ['REPO_NAME']),
             params={"state": "all", "per_page": 100})
 
         self.issues = []
@@ -143,9 +148,8 @@ class OneTimeSyncer(object):
             if issue_card['idList'] != list_to_be_added_to:
                 data_to_update['idList'] = list_to_be_added_to
             if issue['assignee'] is not None:
-                if issue_card['idMembers'] != config['GIT_TO_TRELLO'][issue['assignee']['login']]:
-                    data_to_update['idMembers'] = config[
-                        'GIT_TO_TRELLO'][issue['assignee']['login']]
+                if issue_card['idMembers'] != self.git_to_trello_assignee_map[issue['assignee']['login']]:
+                    data_to_update['idMembers'] = self.git_to_trello_assignee_map[issue['assignee']['login']]
             if len(data_to_update.keys()) > 0:
                 issue_card = trello.put("%s/cards/%s" % (
                     trello_api, issue_card['id']), data=data_to_update).json()
@@ -159,9 +163,9 @@ class OneTimeSyncer(object):
                 issue_card["due"] = milestone['due_on']
             if milestone_label is not None:
                 issue_card["idLabels"] = ",".join(
-                    [milestone_label['id'], config['TASKS_BOARD_DEV_LABEL_ID']])
+                    [milestone_label['id'], os.environ['TASKS_BOARD_DEV_LABEL_ID']])
             if issue['assignee'] is not None:
-                issue_card["idMembers"] = config['GIT_TO_TRELLO'][issue['assignee']['login']]
+                issue_card["idMembers"] = self.git_to_trello_assignee_map[issue['assignee']['login']]
 
             issue_card = trello.post("https://api.trello.com/1/cards", data=issue_card).json()
 
@@ -173,7 +177,7 @@ class OneTimeSyncer(object):
 
         for m, gh_issues in self.grouped_issues:
             # gh_issues = github.get(
-            #     "%s/repos/%s/%s/issues" % (github_api, config['REPO_OWNER'], config['REPO_NAME']),
+            #     "%s/repos/%s/%s/issues" % (github_api, os.environ['REPO_OWNER'], os.environ['REPO_NAME']),
             #     params={"milestone": int(m['number']), "state": "all"}).json()
 
             if m is None:
@@ -187,7 +191,7 @@ class OneTimeSyncer(object):
                     milestone_label = trello.post("https://api.trello.com/1/labels", data={
                         'name': "%s#%s" % (m['title'], m['number']),
                         'color': 'green',
-                        'idBoard': config['TASKS_BOARD_ID']
+                        'idBoard': os.environ['TASKS_BOARD_ID']
                     }).json()
 
             issue_cards = map(lambda issue: self.update_or_create_task_card(
@@ -206,9 +210,9 @@ class OneTimeSyncer(object):
                     milestone_list_to_use = self.milestones_board_lists['To Do']
 
                 members_to_assign = ",".join(
-                    list(set(config['GIT_TO_TRELLO'][i['assignee']['login']]
+                    list(set(self.git_to_trello_assignee_map[i['assignee']['login']]
                          for i in gh_issues if i['assignee'] is not None
-                         and i['assignee']['login'] in config['GIT_TO_TRELLO'])))
+                         and i['assignee']['login'] in self.git_to_trello_assignee_map)))
 
                 try:
                     card = next(card for card in self.existing_milestone_cards
