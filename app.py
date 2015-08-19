@@ -3,8 +3,9 @@ import os
 # from flask.config import Config
 from itertools import groupby
 from toolspy import keygetter
-from flask import Flask, render_template
+from flask import Flask, render_template, request, Response
 import json
+from flask_sqlalchemy_booster.responses import jsoned
 
 # config = Config(os.getcwd())
 # config.from_pyfile("app.cfg.py")
@@ -241,19 +242,31 @@ class OneTimeSyncer(object):
                         card['desc'] = m['description'][:16383]
                     trello.post("https://api.trello.com/1/cards", data=card)
 
-syncer = OneTimeSyncer()
 
-
-def register_milestones_board_trello_hook():
-    trello.post("%s/webhooks", data={
+def register_milestones_board_trello_hook(hook_server=None):
+    if hook_server is None:
+        hook_server = os.environ['TRELLOGIT_WEBHOOK']
+    callback_url = hook_server + "/milestones"
+    trello.post("%s/webhooks" % trello_api, data={
         "description": "Milestone board hook",
-        "callbackURL": ""
+        "callbackURL": callback_url,
+        "idModel": os.environ['MILESTONES_BOARD_ID']
     })
 
 
 @app.route('/')
 def home():
-    return render_template("index.html")
+    record = json.dumps(json.load('record.json'))
+    return render_template("index.html", record=record)
+
+
+@app.route('/milestones')
+def record_milestone_card_action():
+    json.dump(request.get_json(), 'record.json')
+    return Response(jsoned({'status': 'success'}, wrap=False),
+                    200, mimetype='application/json')
+
 
 if __name__ == '__main__':
+    syncer = OneTimeSyncer()
     syncer.github_to_trello_sync()

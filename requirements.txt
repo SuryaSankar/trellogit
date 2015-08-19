@@ -3,4 +3,5 @@ flask
 flask-sqlalchemy
 flask-sqlalchemy-booster
 gunicorn
+python-dateutil
 
