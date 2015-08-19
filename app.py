@@ -3,7 +3,7 @@ import os
 # from flask.config import Config
 from itertools import groupby
 from toolspy import keygetter
-from flask import Flask, render_template, request, Response
+from flask import Flask, render_template, request, Response, current_app
 import json
 from flask_sqlalchemy_booster.responses import jsoned
 
@@ -264,11 +264,14 @@ def home():
 
 @app.route('/milestones', methods=['POST', 'HEAD'])
 def record_milestone_card_action():
-    with open("record.txt", "w") as fp:
-        json.dump({
-            "headers": request.headers,
-            "data": request.get_json()
-        }, fp)
+    try:
+        with open("record.txt", "w") as fp:
+            json.dump({
+                "headers": request.headers,
+                "data": request.get_json()
+            }, fp)
+    except Exception as e:
+        current_app.logger.exception(e)
     return Response(jsoned({'status': 'success'}, wrap=False),
                     200, mimetype='application/json')
 
