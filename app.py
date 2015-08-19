@@ -84,11 +84,11 @@ class OneTimeSyncer(object):
 
         self.milestones_board = trello.get(
             "%s/boards/%s" % (trello_api, os.environ['MILESTONES_BOARD_ID'])).json()
-        os.environ['MILESTONES_BOARD_ID'] = self.milestones_board['id']
+        # os.environ['MILESTONES_BOARD_ID'] = self.milestones_board['id']
 
         self.tasks_board = trello.get(
             "%s/boards/%s" % (trello_api, os.environ['TASKS_BOARD_ID'])).json()
-        os.environ['TASKS_BOARD_ID'] = self.tasks_board['id']
+        # os.environ['TASKS_BOARD_ID'] = self.tasks_board['id']
 
     def fetch_existing_github_state(self):
         self.existing_milestone_labels = trello.get("%s/boards/%s/labels" % (
@@ -242,16 +242,17 @@ class OneTimeSyncer(object):
                         card['desc'] = m['description'][:16383]
                     trello.post("https://api.trello.com/1/cards", data=card)
 
-
-def register_milestones_board_trello_hook(hook_server=None):
-    if hook_server is None:
-        hook_server = os.environ['TRELLOGIT_WEBHOOK']
-    callback_url = hook_server + "/milestones"
-    trello.post("%s/webhooks" % trello_api, data={
-        "description": "Milestone board hook",
-        "callbackURL": callback_url,
-        "idModel": os.environ['MILESTONES_BOARD_ID']
-    })
+    def register_milestones_board_trello_hook(self, hook_server=None):
+        if hook_server is None:
+            hook_server = os.environ['TRELLOGIT_WEBHOOK']
+        callback_url = hook_server + "/milestones"
+        result = trello.post("%s/webhooks" % trello_api, data={
+            "description": "Milestone board hook",
+            "callbackURL": callback_url,
+            "idModel": self.milestones_board['id']
+        })
+        print result
+        return result
 
 
 @app.route('/')
@@ -260,12 +261,12 @@ def home():
     return render_template("index.html", record=record)
 
 
-@app.route('/milestones')
+@app.route('/milestones', methods=['POST'])
 def record_milestone_card_action():
-    json.dump({
-        "headers": request.headers,
-        "data": request.get_json()
-    }, 'record.txt')
+    # json.dump({
+    #     "headers": request.headers,
+    #     "data": request.get_json()
+    # }, 'record.txt')
     return Response(jsoned({'status': 'success'}, wrap=False),
                     200, mimetype='application/json')
 
