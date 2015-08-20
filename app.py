@@ -137,9 +137,11 @@ class Initializer(object):
             else:
                 list_to_be_added_to = self.tasks_board_lists['To Do']
             if issue['comments'] == 0:
-                issue_events = github.get(issue['events_url']).json()
-                if any(event['commit_id'] is not None for event in issue_events):
-                    list_to_be_added_to = self.tasks_board_lists['Doing']
+                if issue.get('events_url') is not None:
+                    print issue['events_url']
+                    issue_events = github.get(issue['events_url']).json()
+                    if any(event['commit_id'] is not None for event in issue_events):
+                        list_to_be_added_to = self.tasks_board_lists['Doing']
 
         try:
             issue_card = next(
@@ -182,7 +184,7 @@ class Initializer(object):
 
     def github_to_trello_sync(self):
 
-        self.fetch_existing_github_state()
+        # self.fetch_existing_github_state()
 
         for m, gh_issues in self.grouped_issues:
             # gh_issues = github.get(
@@ -267,17 +269,36 @@ class Initializer(object):
         if hook_server is None:
             hook_server = os.environ['TRELLOGIT_WEBHOOK']
         callback_url = hook_server + "/github/issues"
-        result = github.post("%s/hooks" % github_api_repo_root, data={
+        print callback_url
+        result = github.post("%s/hooks" % github_api_repo_root, data=json.dumps({
             "name": "web",
             "events": ["issues"],
+            "active": True,
+            "config": {
+                "url": callback_url,
+                "content_type": "json"
+            }
+        }), headers={'Content-Type': 'application/json'})
+        return result
+
+    def register_issue_comments_github_hook(self, hook_server=None):
+        if hook_server is None:
+            hook_server = os.environ['TRELLOGIT_WEBHOOK']
+        callback_url = hook_server + "/github/issue_comments"
+        result = github.post("%s/hooks" % github_api_repo_root, data=json.dumps({
+            "name": "web",
+            "events": ["issue_comments"],
             "config": {
                 "url": callback_url,
                 "content_type": "json",
                 "insecure_ssl": 1
             }
-        })
+        }), headers={'Content-Type': 'application/json'})
         print result
         return result
+
+initializer = Initializer()
+initializer.fetch_existing_github_state()
 
 
 @app.route('/')
@@ -289,6 +310,20 @@ def home():
 def github_issues_hook():
     json_data = request.get_json()
     print json_data
+    if json_data['action'] == 'closed':
+        issue = json_data['issue']
+        issue_card = next(
+            card for card in initializer.existing_issue_cards
+            if card['name'].endswith("#%s" % issue['number']))
+        data_to_update = {
+            'idList': initializer.tasks_board_lists['Done']
+        }
+        modified_issue_card = trello.put("%s/cards/%s" % (
+            trello_api, issue_card['id']), data=data_to_update).json()
+        idx_to_replace = initializer.existing_issue_cards.index(issue_card)
+        initializer.existing_issue_cards.pop(idx_to_replace)
+        initializer.existing_issue_cards.insert(idx_to_replace, modified_issue_card)
+
     return Response(jsoned({'status': 'success'}, wrap=False),
                     200, mimetype='application/json')
 
@@ -310,7 +345,7 @@ def trello_tasks_hook():
 
 
 @app.route('/trello/milestones', methods=['POST', 'HEAD'])
-def record_milestone_card_action():
+def trello_milestones_board_hook():
     # try:
     #     print os.getcwd()
     #     print os.listdir(".")
@@ -325,7 +360,7 @@ def record_milestone_card_action():
     #     traceback.print_exc()
     json_data = request.get_json()
     print json_data
-    if json_data['action']['type'] == 'updateCard':
+    if json_data is not None and json_data['action']['type'] == 'updateCard':
         action_data = json_data['action']['data']
         card_full_data = trello.get("%s/boards/%s/cards/%s" % (
             trello_api, action_data['board']['id'], action_data['card']['id']))
@@ -342,6 +377,4 @@ def record_milestone_card_action():
 
 
 if __name__ == '__main__':
-    initializer = Initializer()
-    # initializer.github_to_trello_sync()
-    app.run(use_reloader=True, use_debugger=True, threaded=True)
+    app.run("0.0.0.0", 5001, use_reloader=True, use_debugger=True, threaded=True)
