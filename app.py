@@ -138,7 +138,6 @@ class Initializer(object):
                 list_to_be_added_to = self.tasks_board_lists['To Do']
             if issue['comments'] == 0:
                 if issue.get('events_url') is not None:
-                    print issue['events_url']
                     issue_events = github.get(issue['events_url']).json()
                     if any(event['commit_id'] is not None for event in issue_events):
                         list_to_be_added_to = self.tasks_board_lists['Doing']
@@ -151,10 +150,16 @@ class Initializer(object):
             if milestone is not None:
                 if issue_card['due'] != milestone['due_on']:
                     data_to_update['due'] = milestone['due_on']
+            if milestone_label is not None:
+                issue_card["idLabels"] = ",".join(
+                    [milestone_label['id'], os.environ['TRELLOGIT_TASKS_BOARD_DEV_LABEL_ID']])
             if issue_card['name'].rpartition("#")[0] != issue['title']:
                 data_to_update['name'] = "%s#%s" % (issue['title'], issue['number'])
             if issue_card['idList'] != list_to_be_added_to:
-                data_to_update['idList'] = list_to_be_added_to
+                if list_to_be_added_to != self.tasks_board_lists['Backlog']:
+                    # If a card is already in a list other than backlog,
+                    # dont move it to backlog
+                    data_to_update['idList'] = list_to_be_added_to
             if issue['assignee'] is not None:
                 if issue_card['idMembers'] != self.git_to_trello_assignee_map[
                         issue['assignee']['login']]:
